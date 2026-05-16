@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Blocked — Web Guardian</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red:     #ff2d2d;
+      --red-dim: #7a1414;
+      --bg:      #080a0f;
+      --surface: #0d1017;
+      --border:  rgba(255,45,45,0.18);
+      --text:    #e8eaf0;
+      --muted:   #5a6070;
+      --mono:    'Space Mono', monospace;
+      --sans:    'Syne', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,45,45,0.03) 39px, rgba(255,45,45,0.03) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,45,45,0.03) 39px, rgba(255,45,45,0.03) 40px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -60%);
+      width: 700px; height: 700px;
+      background: radial-gradient(ellipse, rgba(255,45,45,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .scene {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .statusbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--red-dim), var(--red), var(--red-dim));
+      background-size: 200% 100%;
+      animation: barslide 2.5s ease-in-out infinite;
+    }
+    @keyframes barslide {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .icon-wrap {
+      margin-bottom: 28px;
+      animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes pop {
+      from { opacity: 0; transform: scale(0.6); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .shield svg {
+      width: 72px; height: 72px;
+      filter: drop-shadow(0 0 18px rgba(255,45,45,0.5));
+    }
+
+    .card {
+      width: min(520px, 94vw);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 36px 40px 32px;
+      position: relative;
+      animation: rise 0.5s 0.1s cubic-bezier(0.22,1,0.36,1) both;
+      box-shadow:
+        0 0 0 1px rgba(255,45,45,0.06),
+        0 32px 80px rgba(0,0,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card::before, .card::after {
+      content: '';
+      position: absolute;
+      width: 12px; height: 12px;
+      border-color: var(--red);
+      border-style: solid;
+    }
+    .card::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    .card::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .error-code {
+      position: absolute;
+      top: 20px; right: 24px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--red-dim);
+      letter-spacing: 0.08em;
+      opacity: 0;
+      animation: fadein 0.4s 0.7s forwards;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--red);
+      margin-bottom: 16px;
+      opacity: 0;
+      animation: fadein 0.4s 0.35s forwards;
+    }
+    .tag-dot {
+      width: 6px; height: 6px;
+      background: var(--red);
+      border-radius: 50%;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    h1 {
+      font-family: var(--sans);
+      font-size: clamp(22px, 4vw, 28px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--text);
+      margin-bottom: 12px;
+      opacity: 0;
+      animation: fadein 0.4s 0.45s forwards;
+    }
+
+    .reason-text {
+      font-size: 14px;
+      color: #8b95a8;
+      line-height: 1.6;
+      opacity: 0;
+      animation: fadein 0.4s 0.55s forwards;
+    }
+
+    .keyword-chip {
+      display: none;
+      margin-top: 12px;
+      padding: 4px 10px;
+      background: rgba(255,45,45,0.08);
+      border: 1px solid rgba(255,45,45,0.2);
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--red);
+      letter-spacing: 0.06em;
+      opacity: 0;
+      animation: fadein 0.4s 0.65s forwards;
+    }
+
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .scanline {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: rgba(255,45,45,0.08);
+      animation: scan 4s linear infinite;
+      pointer-events: none;
+      z-index: 2;
+    }
+    @keyframes scan {
+      from { top: 0; }
+      to   { top: 100vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="statusbar"></div>
+  <div class="scanline"></div>
+
+  <div class="scene">
+    <div class="icon-wrap">
+      <div class="shield">
+        <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M36 6L10 17V35C10 50.5 21.5 64.5 36 68C50.5 64.5 62 50.5 62 35V17L36 6Z"
+                fill="rgba(255,45,45,0.08)"
+                stroke="#ff2d2d" stroke-width="1.5" stroke-linejoin="round"/>
+          <line x1="36" y1="27" x2="36" y2="40" stroke="#ff2d2d" stroke-width="2.5" stroke-linecap="round"/>
+          <circle cx="36" cy="47" r="2" fill="#ff2d2d"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="error-code">ERR_BLOCKED</span>
+
+      <div class="tag">
+        <span class="tag-dot"></span>
+        Web Guardian
+      </div>
+
+      <h1>Access Restricted</h1>
+
+      <div class="reason-text">
+        <span id="reason-msg">This page has been blocked.</span>
+        <span id="keyword-chip" class="keyword-chip"></span>
+      </div>
+    </div>
+  </div>
+
+  <script src="block.js"></script>
+</body>
+</html>
