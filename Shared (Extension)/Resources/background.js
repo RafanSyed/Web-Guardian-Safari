@@ -1,7 +1,7 @@
 // background.js — Web Guardian Safari
 
 import { normalizeDomain, getDomainStatus, setDomainStatus, checkAndResetCacheIfNewMonth } from "./domainDB.js";
-import { classifyWebsite, classifySearchQuery, checkAIServerHealth, parseURL, fetchSafeDomains } from "./aiClassifier.js";
+import { classifyWebsite, classifySearchQuery, checkAIServerHealth, parseURL, fetchSafeDomains, classifyYoutubeVideo } from "./aiClassifier.js";
 
 // ------------------------------------------------------------
 // IN-FLIGHT DEDUP
@@ -68,6 +68,10 @@ function ensureSafeDomainsLoaded() {
   return safeDomainsPromise;
 }
 
+
+// ------------------------------------------------------------
+// Bad Keyword Lists
+// ------------------------------------------------------------
 const KEYWORDS = [
   // === MANGA/READING CONTENT ===
   "manga", "manhwa", "manhua", "webtoon", "scanlation", "scanlations",
@@ -76,8 +80,8 @@ const KEYWORDS = [
   "mangafox", "mangapanda", "mangastream", "kissmanga", "readmanga",
   "mangareader", "manganelo", "mangapark", "bato.to", "batoto",
   "dynasty-scans", "webtoons.com", "tapas.io", "lezhin", "tappytoon",
-  "pocket comics", "raw manga", "raw chapter", "raw scan", "manhwa raw",
-  "webtoon raw", "translated manga", "fan translation", "doujin",
+  "pocket comics", "raw manga", "raw scan", "manhwa raw",
+  "webtoon raw", "translated manga", "doujin",
   "doujinshi", "doujins", "hentai", "hentai manga", "ecchi", "seinen",
   "josei", "shoujo", "shonen", "bl manga", "yaoi", "yuri", "smut manga",
   "adult manga", "mature manga", "r18 manga", "18+ manga",
@@ -184,7 +188,7 @@ const KEYWORD_EXCEPTIONS = new Set([
   "modern art", "contemporary art", "spicy", "dark romance",
   "forbidden", "savage", "beast", "beastly", "heat", "mating",
   "breeding", "rut", "pov", "amateur", "homemade", "influencer",
-  "swimsuit", "bathing suit", "one piece", "sports bra", "crop top",
+  "swimsuit", "bathing suit", "sports bra", "crop top",
   "leggings", "yoga pants", "spandex", "bodysuit", "bikini",
   "try on haul", "try-on haul", "clothing haul", "outfit reveal",
   "dress reveal", "shirtless", "backless", "cleavage", "big",
@@ -241,7 +245,7 @@ const HARD_BLOCK_KEYWORDS = new Set([
   "stripper", "strip club", "prostitute", "prostitution",
   "escort service", "sex worker", "sex work", "cam girl", "camgirl",
   "camboy", "manga", "manhwa", "manhua", "webtoon", "hentai manga",
-  "doujin", "doujinshi", "scanlation", "chapter", "ecchi", "yaoi",
+  "doujin", "doujinshi", "scanlation", "ecchi", "yaoi",
   "yuri", "anime", "thirst trap", "discord nsfw", "r/gonewild",
   "r/nsfw", "bikini try on", "lingerie try on", "upskirt",
   "downblouse", "nip slip", "camel toe", "topless", "braless",
@@ -249,8 +253,178 @@ const HARD_BLOCK_KEYWORDS = new Set([
   "literotica", "erotic fiction", "erotic novel", "smut",
   "adult chat", "sex chat", "phone sex", "cyber sex",
   "dick pic", "send nudes", "fuck", "fucked", "fucking",
-  "cocksucker", "motherfucker",
+  "cocksucker", "motherfucker", "desire"
 ]);
+
+const YOUTUBE_BLOCK_KEYWORDS = new Set([
+  // === ANIME / MANGA TROPES ===
+  "isekai", "manga", "manhwa", "manhua", "webtoon", "anime", "waifu", "husbando",
+  "yandere", "tsundere", "kuudere", "dandere", "deredere", "loli", "shonen",
+  "shoujo", "seinen", "josei", "ecchi", "harem", "reverse harem", "omegaverse",
+  "reborn", "rebirth", "reincarnated", "reincarnation", "another world",
+  "transported to another world", "summoned to another world", "overpowered",
+  "op mc", "cultivation", "system notification", "level up", "dungeon",
+  "demon lord", "hero", "villain protagonist", "villainess", "otome",
+  "childhood friend", "childhood crush", "first love", "unrequited love",
+  "goddess", "god of", "divine", "sacred",
+
+  // === ROMANCE / RELATIONSHIP ===
+  "romance", "romantic", "romcom", "rom com", "love story", "love interest",
+  "girlfriend", "boyfriend", "situationship", "talking stage", "dating",
+  "crush", "jealous", "jealousy", "possessive", "obsessed with me",
+  "fell for me", "falls for me", "in love with", "confess", "confession",
+  "rejected", "heartbreak", "breakup", "get him back", "get her back",
+  "make him jealous", "make her jealous", "toxic relationship", "toxic love",
+  "forbidden love", "secret relationship", "fake dating", "fake relationship",
+  "enemies to lovers", "strangers to lovers", "forced proximity",
+  "age gap", "older man", "younger woman", "sugar",
+
+  // === BRAINROT / VIRAL ===
+  "challenge", "big bank", "body challenge", "silhouette challenge",
+  "rizz", "rizzing", "rizzed", "unspoken rizz", "sigma", "alpha male",
+  "alpha female", "gigachad", "chad", "based", "slay", "no cap",
+  "bussin", "understood the assignment", "main character", "POV",
+  "storytime", "story time", "exposing", "exposed", "drama",
+  "tea", "spilling tea", "receipts", "beef", "cancelled", "cancel",
+  "glow up", "transformation", "rate me", "rating",
+
+  // === GOONING / ADDICTION ===
+  "gooning", "goon", "gooner", "edging", "brain rot", "brainrot",
+  "dopamine", "addicted", "can't stop", "hours later", "3am",
+  "you won't believe", "i can't stop watching", "satisfying",
+  "oddly satisfying", "mindless", "binge",
+
+  // === CLICKBAIT / RABBIT HOLE ===
+  "insane body", "unbelievable body",
+  "gone sexual", "exposed",
+
+  // === THIRST / APPEARANCE FOCUSED ===
+  "hottest", "sexiest", "most attractive", "body type", "body check",
+  "body reveal", "weight loss reveal", "before and after body",
+  "thirst trap", "e-girl", "egirl", "soft girl", "baddie",
+  "instagram model", "tiktok famous", "only fans", "onlyfans",
+  "gym crush", "gym thirst", "locker room",
+
+  // === MUSIC / DANCE (PROBLEMATIC) ===
+  "twerk", "twerking", "dance challenge", "WAP", "body ody",
+  "freaky", "freak", "nasty", "dirty dancing", "lap dance",
+  "strip", "pole dance", "grinding", "booty",
+
+  // === GAMING ADJACENT ===
+  "waifu game", "dating sim", "visual novel", "gacha", "gacha life",
+  "gacha club", "gacha heat", "yandere simulator", "dress up game",
+  "character creator romance",
+
+  // === REACTION / COMMENTARY BAIT ===
+  "reacting to hot", "rating hot", "thirst ranking", "attractive ranking",
+  "hottest characters", "best looking", "most beautiful",
+  "prettiest", "most handsome", "eye candy",
+]);
+
+
+// --------------------------------------------
+// YOUTUBE SAFE CHANNELS
+// --------------------------------------------
+const SAFE_YOUTUBE_CHANNELS = new Set([
+  "Masjid DarusSalam",
+  "JudeLow",
+  "GrandLineReview",
+  "AyoLaxzone",
+  "The Irish Guy",
+  "W2S+",
+  "LucasTracyMMA",
+  "DakarsWRLD",
+  "Big Gibber",
+  "Chuck Nasty",
+  "VIDDAL",
+  "Morj Unleashed",
+  "Beast Philanthropy",
+  "Sacred Chronicles",
+  "FORMULA 1",
+  "Code Blue Cam",
+  "P1 with Matt & Tommy",
+  "Wildez",
+  "ish",
+  "Joe Bartolozzi",
+  "Abdul Respond",
+  "Mohammed Hijab",
+  "Behzinga",
+  "SYFEtalk",
+  "MrBeast Gaming",
+  "ManyProphetsOneMessage",
+  "Ali Dawah",
+  "stampylongnose",
+  "Uncovered",
+  "fern",
+  "EvenMoreSidemen",
+  "Towards Eternity",
+  "ChrisMD",
+  "OnePath Network",
+  "nigahiga",
+  "Danny Gonzalez",
+  "Anton is here",
+  "Dream",
+  "Rick'sF1Addiction",
+  "Miniminter",
+  "MrBeast",
+  "FNG",
+  "Yeah Jaron",
+  "jacksepticeye",
+  "Hei Reacts",
+  "NeetCode",
+  "iBallisticSquid",
+  "Kufah Official",
+  "Midwest Safety",
+  "Max Fosh",
+  "Niko Omilana",
+  "Joe Bart Games",
+  "Smile 2 Jannah",
+  "Deenresponds",
+  "Aman Manazir",
+  "AnEsonGib",
+  "DreamXD",
+  "Watcher",
+  "stampylonghead",
+  "MM7Games",
+  "Quran Majeed App",
+  "Spoke",
+  "Mxngo",
+  "Wemmbu",
+  "Morj Chapter Reviews",
+  "Kufah DIS",
+  "DrDonut Clips",
+  "Adnan Rashid",
+  "DC Dawah",
+  "Dawah Over Dunya",
+  "OfficeHanchoBoxing",
+  "Propa Boxing",
+  "Fireship",
+  "SpeedSilver",
+  "SunnyV2",
+  "rekrap1",
+  "TalkFCB",
+  "Reading Crow",
+  "Mr Morj",
+  "rekrap2",
+  "Vikkstar123",
+  "F1 News - TacticalRab",
+  "Formula 1 clipz",
+  "Poofesure",
+  "Hibou 3HD",
+  "Kr1s",
+  "GeorgeNotFound",
+  "Sapnap",
+  "BadBoyHalo",
+  "ParrotX2",
+  "FlameFragsMC",
+  "Skeppy",
+  "EWUBodycam",
+  "Zac-Rios",
+  "yaqeeninstituteofficial",
+  "ScaryInteresting",
+]);
+  
+
 // ------------------------------------------------------------
 // SMART KEYWORD MATCHING
 // ------------------------------------------------------------
@@ -285,6 +459,36 @@ function matchesKeywordSmart(text) {
     if (regex.test(normalized)) return kw;
   }
 
+  for (const kw of KEYWORDS) {
+    if (HARD_BLOCK_KEYWORDS.has(kw)) continue;
+    if (KEYWORD_EXCEPTIONS.has(kw)) continue;
+    const normKw = normalizeText(kw);
+    const regex = new RegExp(`(?<![a-z0-9])${escapeRegex(normKw)}(?![a-z0-9])`, "i");
+    if (regex.test(normalized)) return kw;
+  }
+
+  return null;
+}
+
+function matchesYoutubeKeywordSmart(text) {
+  if (!text) return null;
+  const normalized = normalizeText(text);
+
+  // 1. Hard blocks first
+  for (const kw of HARD_BLOCK_KEYWORDS) {
+    const normKw = normalizeText(kw);
+    const regex = new RegExp(`(?<![a-z0-9])${escapeRegex(normKw)}(?![a-z0-9])`, "i");
+    if (regex.test(normalized)) return kw;
+  }
+
+  // 2. YouTube-specific keywords
+  for (const kw of YOUTUBE_BLOCK_KEYWORDS) {
+    const normKw = normalizeText(kw);
+    const regex = new RegExp(`(?<![a-z0-9])${escapeRegex(normKw)}(?![a-z0-9])`, "i");
+    if (regex.test(normalized)) return kw;
+  }
+
+  // 3. General keywords as fallback
   for (const kw of KEYWORDS) {
     if (HARD_BLOCK_KEYWORDS.has(kw)) continue;
     if (KEYWORD_EXCEPTIONS.has(kw)) continue;
@@ -498,8 +702,62 @@ async function handleMainFrameUrl(tabId, url) {
     }
   }
 
-  // 4. Detailed Path Evaluation
-  if (pathQuery && !(rootDomain === "youtube.com" && pathQuery.includes("watch?v="))) {
+  // 4. YouTube Video Title Check
+  if (rootDomain === "youtube.com") {
+    const watchMatch = pathQuery?.match(/watch\?v=([a-zA-Z0-9_-]+)/);
+    if (watchMatch) {
+      const videoId = watchMatch[1];
+      const flightKey = `${tabId}:yt:${videoId}`;
+      if (!inFlightDomains.has(flightKey)) {
+        inFlightDomains.add(flightKey);
+        try {
+          const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            // 401 restricted/private video — block by default
+            console.log(`[Web Guardian] 🚫 YouTube video ${videoId} — restricted/unavailable, blocking`);
+            await redirectOnce(tabId, buildBlockUrl("Video unavailable or age-restricted", url));
+            return;
+          }
+
+          const title = data.title ?? "";
+          const author = data.author_name ?? "";
+          console.log(`[Web Guardian] 🎬 YouTube title: "${title}"`);
+          console.log(`[Web Guardian] 🎬 YouTube author: "${author}"`);
+
+          if (SAFE_YOUTUBE_CHANNELS.has(author)) {
+            console.log(`[Web Guardian] ✅ YouTube — trusted channel: "${author}"`);
+            return;
+          }
+
+          const kwMatch = matchesYoutubeKeywordSmart(title);
+          if (kwMatch) {
+            console.log(`[Web Guardian] 🚫 YouTube title matched keyword: "${kwMatch}"`);
+            await redirectOnce(tabId, buildBlockUrl(`Video title matched: ${kwMatch}`, url));
+            await recordBlockHit();
+            return;
+          }
+
+          // No keyword hit — send to AI as safety net
+          const aiResult = await classifyYoutubeVideo(title);
+          if (aiResult === "BLOCK") {
+            console.log(`[Web Guardian] 🚫 YouTube video blocked by AI — "${title}"`);
+            await redirectOnce(tabId, buildBlockUrl("AI blocked video content", url));
+            await recordBlockHit();
+            return;
+          }
+
+        } finally {
+          inFlightDomains.delete(flightKey);
+        }
+      }
+      return;
+    }
+  }
+
+  // 4. Detailed Path Evaluation (non-YouTube)
+  if (pathQuery) {
     const pathResult = await parseURL(pathQuery);
     if (pathResult?.classification === "BLOCK") {
       console.log(`[Web Guardian] 🚫 ${rootDomain} — path content flagged`);

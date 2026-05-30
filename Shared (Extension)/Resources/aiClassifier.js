@@ -36,28 +36,28 @@ export async function classifySearchQuery(query) {
 }
 
 // ------------------------------------------------------------
-// CLASSIFY YOUTUBE SEARCH
+// CLASSIFY YOUTUBE VIDEO
 // ------------------------------------------------------------
-export async function classifyYoutubeSearchQuery(query) {
+export async function classifyYoutubeVideo(title) {
   try {
-    console.log(`[Youtube Classifier] Sending search query to AI: "${query}"`);
+    console.log(`[Youtube Classifier] Sending video title to AI: "${title}"`);
 
     const response = await fetch(`${AI_SERVER_URL}/classify-youtube`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ title }),
     });
 
     if (!response.ok) {
       console.error(`[Youtube Classifier] Server error: ${response.status}`);
-      return "UNKNOWN";
+      return "BLOCK"; // fail safe
     }
-
+    
     const data = await response.json();
     return data.classification;
   } catch (error) {
-    console.error("[Youtube Classifier] Failed to classify search query:", error);
-    return "UNKNOWN";
+    console.error("[Youtube Classifier] Failed to classify video title:", error);
+    return "BLOCK"; // fail safe
   }
 }
 
