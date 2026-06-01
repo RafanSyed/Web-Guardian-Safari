@@ -107,9 +107,39 @@ function redirectToBlock(reason) {
 }
 
 // ------------------------------------------------------------
-// MAIN
+// DETECT DYNAMIC TRANSITIONS (SPA HOOKS)
 // ------------------------------------------------------------
-(async function () {
+let lastCheckedUrl = location.href;
+
+function checkUrlChange() {
+  const currentUrl = location.href;
+  if (currentUrl !== lastCheckedUrl) {
+    lastCheckedUrl = currentUrl;
+    
+    // If the domain is YouTube and navigating to a video watch route
+    if (currentUrl.includes("youtube.com") && currentUrl.includes("watch?v=")) {
+      console.log(`[Web Guardian] 🔄 SPA URL Shift detected: ${currentUrl}`);
+      browser.runtime.sendMessage({ action: "evaluateYoutubeUrl", url: currentUrl });
+    }
+  }
+}
+
+// Listen for back/forward navigation and hash routers
+window.addEventListener("popstate", checkUrlChange);
+window.addEventListener("hashchange", checkUrlChange);
+
+// Observe DOM updates for titles or layouts modifying the structural history (e.g., YouTube processing a state transition)
+const spaObserver = new MutationObserver(() => {
+  checkUrlChange();
+});
+if (document.head) {
+  spaObserver.observe(document.head, { childList: true, subtree: true });
+}
+
+// ------------------------------------------------------------
+// MAIN INITIALIZATION
+// ------------------------------------------------------------
+(async function initContentScript() {
   const domain = normalizeDomain(location.href);
   if (!domain) return;
 
@@ -122,9 +152,14 @@ function redirectToBlock(reason) {
     location.href.startsWith("data:")
   ) return;
 
-  // Safe list — skip all checks
+  // Handle immediate verification if the tab loads directly onto a watch link
+  if (domain === "youtube.com" && location.href.includes("watch?v=")) {
+    browser.runtime.sendMessage({ action: "evaluateYoutubeUrl", url: location.href });
+  }
+
+  // Safe list — skip standard domain blocking
   if (SAFE_DOMAINS.some(safe => domain === safe || domain.endsWith(`.${safe}`))) {
-    console.log(`[Web Guardian] ✅ ${domain} — safe domain, skipping`);
+    console.log(`[Web Guardian] ✅ ${domain} — safe domain, skipping standard domain checks`);
     return;
   }
 

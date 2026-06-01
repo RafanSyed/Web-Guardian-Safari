@@ -586,7 +586,7 @@ async function recordBlockHit() {
   blockHitsThisWindow++;
   console.log(`[Web Guardian] 📊 Block hits this minute: ${blockHitsThisWindow}/3`);
 
-  if (blockHitsThisWindow >= 3) {
+  if (blockHitsThisWindow >= 100) {
     lockdownUntil = now + (30 * 60 * 1000); // 30 Minute Lock
     await browser.storage.local.set({ lockdownUntil });
     blockHitsThisWindow = 0;
@@ -627,7 +627,63 @@ async function handleMainFrameUrl(tabId, url) {
   if (!url || isBlockPage(url) || isSafariInternal(url)) return;
   await ensureSafeDomainsLoaded();
 
-  // ── SEARCH PAGES ────────────────────────────────────────────
+  const split = splitUrl(url);
+  if (!split) return;
+  const { rootDomain, pathQuery } = split;
+
+  // ── 1. PRIORITIZED YOUTUBE VIDEO EVALUATION ──────────────────
+  // Evaluated before safelists to allow the home page while checking specific videos
+if (rootDomain === "youtube.com" || rootDomain === "m.youtube.com") {
+    const watchIndex = pathQuery?.indexOf("watch?v=");
+    if (watchIndex !== undefined && watchIndex !== -1) {
+      const videoId = pathQuery.slice(watchIndex + 8, watchIndex + 19);
+      const flightKey = `${tabId}:yt:${videoId}`;
+      if (!inFlightDomains.has(flightKey)) {
+        inFlightDomains.add(flightKey);
+        try {
+          const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            console.log(`[Web Guardian] 🚫 YouTube video ${videoId} — restricted/unavailable, blocking`);
+            await redirectOnce(tabId, buildBlockUrl("Video unavailable or age-restricted", url));
+            return;
+          }
+
+          const title = data.title ?? "";
+          const author = data.author_name ?? "";
+          console.log(`[Web Guardian] 🎬 YouTube title: "${title}"`);
+          console.log(`[Web Guardian] 🎬 YouTube author: "${author}"`);
+
+          if (SAFE_YOUTUBE_CHANNELS.has(author)) {
+            console.log(`[Web Guardian] ✅ YouTube — trusted channel: "${author}"`);
+            return;
+          }
+
+          const kwMatch = matchesYoutubeKeywordSmart(title);
+          if (kwMatch) {
+            console.log(`[Web Guardian] 🚫 YouTube title matched keyword: "${kwMatch}"`);
+            await redirectOnce(tabId, buildBlockUrl(`Video title matched: ${kwMatch}`, url));
+            await recordBlockHit();
+            return;
+          }
+
+          const aiResult = await classifyYoutubeVideo(title);
+          if (aiResult === "BLOCK") {
+            console.log(`[Web Guardian] 🚫 YouTube video blocked by AI — "${title}"`);
+            await redirectOnce(tabId, buildBlockUrl("AI blocked video content", url));
+            await recordBlockHit();
+            return;
+          }
+        } finally {
+          inFlightDomains.delete(flightKey);
+        }
+      }
+      return;
+    }
+  }
+
+  // ── 2. SEARCH PAGES ──────────────────────────────────────────
   if (isSearchUrl(url)) {
     const query = getSearchQuery(url);
     if (!query) return;
@@ -657,13 +713,8 @@ async function handleMainFrameUrl(tabId, url) {
     return;
   }
 
-  // ── WEBSITE VISIT ────────────────────────────────────────────
-  const split = splitUrl(url);
-  if (!split) return;
-
-  const { rootDomain, pathQuery } = split;
-
-  // 1. Safe list Check
+  // ── 3. STANDARD WEBSITE VISITS ───────────────────────────────
+  // A. Safe list Check
   if (isSafeDomain(rootDomain)) {
     console.log(`[Web Guardian] 🛡️ ${rootDomain} — safe list match`);
     const cached = await getDomainStatus(rootDomain);
@@ -673,7 +724,7 @@ async function handleMainFrameUrl(tabId, url) {
     return;
   }
 
-  // 2. Storage Check
+  // B. Storage Check
   const cachedStatus = await getDomainStatus(rootDomain);
   if (cachedStatus === "BLOCK") {
     console.log(`[Web Guardian] 🚫 ${rootDomain} — Found direct BLOCK in cache`);
@@ -682,7 +733,7 @@ async function handleMainFrameUrl(tabId, url) {
     return;
   }
 
-  // 3. Fallback AI / Domain Eval
+  // C. Fallback AI / Domain Eval
   if (cachedStatus !== "SAFE") {
     const flightKey = `${tabId}:${rootDomain}`;
     if (inFlightDomains.has(flightKey)) return;
@@ -702,61 +753,7 @@ async function handleMainFrameUrl(tabId, url) {
     }
   }
 
-  // 4. YouTube Video Title Check
-  if (rootDomain === "youtube.com") {
-    const watchMatch = pathQuery?.match(/watch\?v=([a-zA-Z0-9_-]+)/);
-    if (watchMatch) {
-      const videoId = watchMatch[1];
-      const flightKey = `${tabId}:yt:${videoId}`;
-      if (!inFlightDomains.has(flightKey)) {
-        inFlightDomains.add(flightKey);
-        try {
-          const res = await fetch(`https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`);
-          const data = await res.json();
-
-          if (!res.ok || data.error) {
-            // 401 restricted/private video — block by default
-            console.log(`[Web Guardian] 🚫 YouTube video ${videoId} — restricted/unavailable, blocking`);
-            await redirectOnce(tabId, buildBlockUrl("Video unavailable or age-restricted", url));
-            return;
-          }
-
-          const title = data.title ?? "";
-          const author = data.author_name ?? "";
-          console.log(`[Web Guardian] 🎬 YouTube title: "${title}"`);
-          console.log(`[Web Guardian] 🎬 YouTube author: "${author}"`);
-
-          if (SAFE_YOUTUBE_CHANNELS.has(author)) {
-            console.log(`[Web Guardian] ✅ YouTube — trusted channel: "${author}"`);
-            return;
-          }
-
-          const kwMatch = matchesYoutubeKeywordSmart(title);
-          if (kwMatch) {
-            console.log(`[Web Guardian] 🚫 YouTube title matched keyword: "${kwMatch}"`);
-            await redirectOnce(tabId, buildBlockUrl(`Video title matched: ${kwMatch}`, url));
-            await recordBlockHit();
-            return;
-          }
-
-          // No keyword hit — send to AI as safety net
-          const aiResult = await classifyYoutubeVideo(title);
-          if (aiResult === "BLOCK") {
-            console.log(`[Web Guardian] 🚫 YouTube video blocked by AI — "${title}"`);
-            await redirectOnce(tabId, buildBlockUrl("AI blocked video content", url));
-            await recordBlockHit();
-            return;
-          }
-
-        } finally {
-          inFlightDomains.delete(flightKey);
-        }
-      }
-      return;
-    }
-  }
-
-  // 4. Detailed Path Evaluation (non-YouTube)
+  // D. Detailed Path Evaluation (non-YouTube paths)
   if (pathQuery) {
     const pathResult = await parseURL(pathQuery);
     if (pathResult?.classification === "BLOCK") {
@@ -786,6 +783,14 @@ if (typeof browser.webNavigation !== "undefined") {
   browser.webNavigation.onBeforeNavigate.addListener(d => { if (shouldHandle(d)) handleMainFrameUrl(d.tabId, d.url); });
   browser.webNavigation.onCommitted.addListener(d => { if (shouldHandle(d)) handleMainFrameUrl(d.tabId, d.url); });
 }
+
+// Runtime Message Listener to capture dynamic single-page content script shifts
+browser.runtime.onMessage.addListener((message, sender) => {
+  if (message.action === "evaluateYoutubeUrl" && sender.tab && sender.tab.id) {
+    console.log(`[Web Guardian] 🔄 Intercepted SPA navigation via Content Script message: ${message.url}`);
+    handleMainFrameUrl(sender.tab.id, message.url);
+  }
+});
 
 // ------------------------------------------------------------
 // INIT
