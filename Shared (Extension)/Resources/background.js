@@ -586,7 +586,7 @@ async function recordBlockHit() {
   blockHitsThisWindow++;
   console.log(`[Web Guardian] 📊 Block hits this minute: ${blockHitsThisWindow}/3`);
 
-  if (blockHitsThisWindow >= 100) {
+  if (blockHitsThisWindow >= 5) {
     lockdownUntil = now + (30 * 60 * 1000); // 30 Minute Lock
     await browser.storage.local.set({ lockdownUntil });
     blockHitsThisWindow = 0;
