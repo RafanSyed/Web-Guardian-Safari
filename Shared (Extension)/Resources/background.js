@@ -210,6 +210,8 @@ async function redirectOnce(tabId, targetUrl) {
 // MAIN HANDLER
 // ------------------------------------------------------------
 async function handleMainFrameUrl(tabId, url) {
+  console.log(`[Pure Path][DEBUG] handleMainFrameUrl called with: ${url}`);
+
   await clearExpiredLockdown();
 
   if (isLockedDown()) {
@@ -245,7 +247,9 @@ async function handleMainFrameUrl(tabId, url) {
 
   // ── 2. SEARCH PAGES ────────────────────────────────────────────────
   if (isSearchUrl(url)) {
+    console.log(`[Pure Path][DEBUG] isSearchUrl matched: ${url}`);
     const query = getSearchQuery(url);
+    console.log(`[Pure Path][DEBUG] extracted query: "${query}"`);
     if (!query) return;
 
     const kwMatch = matchesKeywordSmart(query);
@@ -256,8 +260,12 @@ async function handleMainFrameUrl(tabId, url) {
       return;
     }
 
+    console.log(`[Pure Path][DEBUG] no keyword match, calling AI for: "${query}"`);
     const flightKey = `${tabId}:${query}`;
-    if (inFlightSearches.has(flightKey)) return;
+    if (inFlightSearches.has(flightKey)) {
+      console.log(`[Pure Path][DEBUG] deduped — already in flight for this exact query`);
+      return;
+    }
     inFlightSearches.add(flightKey);
 
     try {

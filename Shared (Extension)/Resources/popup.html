@@ -25,6 +25,14 @@
 
     <button id="btn-block-site" class="btn-danger">Block this site</button>
 
+    <div id="confirm-box" style="display:none; margin-top:10px; padding:12px; background:rgba(180,67,46,0.08); border:1px solid rgba(180,67,46,0.2); border-radius:10px; text-align:center;">
+      <p style="font-size:12.5px; margin:0 0 10px;">Block this site?</p>
+      <div style="display:flex; gap:8px;">
+        <button id="confirm-yes" class="btn-danger" style="flex:1;">Yes, block</button>
+        <button id="confirm-no" class="btn-disabled" style="flex:1; pointer-events:auto; cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+
     <div class="stats">
       <div class="stat">
         <div class="stat-value" id="blocked-count">—</div>

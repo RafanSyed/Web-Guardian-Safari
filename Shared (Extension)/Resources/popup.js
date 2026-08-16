@@ -96,10 +96,25 @@ async function init() {
     disableButton(blockBtn, "Permanently safe — can't block here");
   }
 
-  blockBtn.addEventListener("click", async () => {
-    const confirmed = confirm(`Block "${domain}"?\n\nThis will mark it BLOCKED going forward.`);
-    if (!confirmed) return;
+  const confirmBox = document.getElementById("confirm-box");
+  const confirmYes = document.getElementById("confirm-yes");
+  const confirmNo = document.getElementById("confirm-no");
 
+  blockBtn.addEventListener("click", () => {
+    // window.confirm() is unreliable inside Safari extension popups —
+    // use an inline confirm box instead (matches the old extension's proven fix).
+    confirmBox.style.display = "block";
+    blockBtn.style.display = "none";
+  });
+
+  confirmNo.addEventListener("click", () => {
+    confirmBox.style.display = "none";
+    blockBtn.style.display = "block";
+  });
+
+  confirmYes.addEventListener("click", async () => {
+    confirmBox.style.display = "none";
+    blockBtn.style.display = "block";
     blockBtn.disabled = true;
     blockBtn.textContent = "Blocking…";
 
