@@ -1,86 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hold On</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, 'Segoe UI', sans-serif;
-      min-height: 100vh;
-      background: #fdf6ee;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 2rem;
-    }
-    .card {
-      background: #fffcf7;
-      border: 1px solid #e8d9c4;
-      border-radius: 6px;
-      max-width: 420px;
-      width: 100%;
-      padding: 2.5rem 2rem;
-    }
-    .eyebrow {
-      font-size: 11px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #b89c7a;
-      margin-bottom: 1.25rem;
-    }
-    .headline {
-      font-size: 1.15rem;
-      font-weight: 400;
-      color: #5c4a30;
-      margin-bottom: 1.5rem;
-      line-height: 1.6;
-    }
-    .divider {
-      border: none;
-      border-top: 1px solid #e8d9c4;
-      margin: 1.5rem 0;
-    }
-    .body-text {
-      font-size: 14px;
-      color: #7a6347;
-      line-height: 1.9;
-      margin-bottom: 1.5rem;
-    }
-    .grounding {
-      font-size: 13px;
-      color: #a08060;
-      line-height: 1.9;
-      padding-left: 1rem;
-      border-left: 2px solid #e0c9a8;
-      margin-bottom: 1.75rem;
-    }
-    .close-line {
-      font-size: 15px;
-      font-style: italic;
-      color: #8a6e4e;
-      line-height: 1.7;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Locked — Pure Path</title>
+<style>
+  :root {
+    --void: #0A0A0B; --void-raised: #141416; --crimson: #E11D2E; --crimson-dim: #8A121F;
+    --ash: #C9C6C2; --ash-dim: #7A7672; --line: #232325;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--void);
+    background-image: radial-gradient(ellipse at top, rgba(225,29,46,0.10), transparent 55%);
+    color: var(--ash);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px;
+  }
+  .frame {
+    max-width: 560px; width: 100%; background: var(--void-raised);
+    border: 1px solid var(--line); border-top: 3px solid var(--crimson); padding: 52px 44px; position: relative;
+  }
+  .eyebrow {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--crimson); margin: 0 0 18px; display: flex; align-items: center; gap: 8px;
+  }
+  .eyebrow::before { content: ""; width: 7px; height: 7px; background: var(--crimson); display: inline-block; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  h1 {
+    font-weight: 900; font-size: 34px; line-height: 1.1; letter-spacing: -0.01em;
+    text-transform: uppercase; margin: 0 0 16px; color: #F5F3F1;
+  }
+  .sub { font-size: 14.5px; line-height: 1.65; color: var(--ash-dim); margin: 0 0 36px; max-width: 44ch; }
+  .timer-block { background: #000; border: 1px solid var(--line); padding: 24px; text-align: center; margin-bottom: 32px; }
+  .timer-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ash-dim); margin-bottom: 10px; }
+  .timer {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 48px; font-weight: 700;
+    color: var(--crimson); letter-spacing: 0.03em; font-variant-numeric: tabular-nums;
+  }
+  .timer-caption { font-size: 11.5px; color: var(--ash-dim); margin-top: 8px; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .stat-row:last-of-type { border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+  .stat-label { color: var(--ash-dim); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; font-weight: 700; padding-top: 2px; }
+  .stat-value { color: var(--ash); font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; text-align: right; }
+  .verdict { font-size: 13.5px; line-height: 1.7; color: var(--ash-dim); border-left: 2px solid var(--crimson-dim); padding-left: 16px; }
+  .verdict strong { color: var(--ash); }
+</style>
 </head>
 <body>
-  <div class="card">
-    <div class="eyebrow">hold on</div>
-    <div class="headline">You just spent the last few minutes trying to find a way around your own system.</div>
-    <hr class="divider">
-    <div class="body-text">
-      That's the craving talking — not you.<br>
-      It feels urgent. It isn't.
+  <div class="frame">
+    <p class="eyebrow">Lockdown active</p>
+    <h1>Everything's blocked. On purpose.</h1>
+    <p class="sub">Three flagged requests in one minute tripped the lockdown. Every site is locked until the timer below runs out — no exceptions, no override.</p>
+
+    <div class="timer-block">
+      <div class="timer-label">Time remaining</div>
+      <div class="timer" id="countdown">--:--</div>
+      <div class="timer-caption" id="countdown-caption">Calculating…</div>
     </div>
-    <div class="grounding">
-      Feel your feet on the floor.<br>
-      Notice the air temperature in the room.<br>
-      Take one slow breath out.
+
+    <div class="stat-row">
+      <span class="stat-label">Trigger threshold</span>
+      <span class="stat-value">3 blocks / 60s</span>
     </div>
-    <div class="close-line">
-      You already know this isn't worth it.
+    <div class="stat-row">
+      <span class="stat-label">Lockdown duration</span>
+      <span class="stat-value">30 min</span>
     </div>
+
+    <p class="verdict">This isn't a punishment. It's a circuit breaker — <strong>the pattern that tripped it is the thing worth sitting with</strong> until it resets.</p>
   </div>
+
+  <script src="testing-block.js"></script>
 </body>
 </html>
