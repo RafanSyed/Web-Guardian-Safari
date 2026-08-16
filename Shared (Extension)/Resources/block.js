@@ -1,49 +1,28 @@
-//
-//  block.js
-//  Web-Guardian-IOS
-//
-//  Created by Rafan Syed on 5/14/26.
-//
+const params = new URLSearchParams(window.location.search);
 
-// block.js — Web Guardian Safari
+const reasonEl = document.getElementById("blocked-reason");
+const urlEl = document.getElementById("blocked-url");
 
-const params    = new URLSearchParams(location.search);
-const rawReason = (params.get("reason") || "").toLowerCase();
+const reason = params.get("reason") || "Blocked by Pure Path";
+const blockedUrl = params.get("url") || "";
 
-const msgEl  = document.getElementById("reason-msg");
-const chipEl = document.getElementById("keyword-chip");
+if (reasonEl) reasonEl.textContent = reason;
 
-if (rawReason.includes("keyword")) {
-  const match   = rawReason.match(/keyword[:\s]+(.+)$/i);
-  const keyword = match ? match[1].trim() : null;
-
-  msgEl.textContent = "This content was blocked because it matched a restricted keyword.";
-
-  if (keyword && chipEl) {
-    chipEl.textContent   = keyword;
-    chipEl.style.display = "inline-block";
+if (urlEl) {
+  try {
+    const u = new URL(blockedUrl);
+    urlEl.textContent = u.hostname + u.pathname;
+  } catch {
+    urlEl.textContent = blockedUrl || "—";
   }
-
-} else if (rawReason.includes("youtube")) {
-  msgEl.textContent = "This YouTube search contains restricted content.";
-
-} else if (rawReason.includes("amazon")) {
-  msgEl.textContent = "This Amazon search contains restricted content.";
-
-} else if (rawReason.includes("cached")) {
-  msgEl.textContent = "This site has been previously identified as restricted content.";
-
-} else if (rawReason.includes("domain")) {
-  msgEl.textContent = "This website has been identified as restricted content.";
-
-} else if (rawReason.includes("ai") || rawReason.includes("path")) {
-  msgEl.textContent = "This content was reviewed and blocked by Web Guardian's AI filter.";
-
-} else {
-  msgEl.textContent = "This page has been blocked by Web Guardian.";
 }
 
-// History trap
+const closeBtn = document.getElementById("close-btn");
+closeBtn?.addEventListener("click", () => {
+  window.close();
+});
+
+// History trap — prevents back-button from revealing the blocked page's content
 history.replaceState(null, "", location.href);
 history.pushState(null, "", location.href);
 window.addEventListener("popstate", () => {

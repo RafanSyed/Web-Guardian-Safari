@@ -1,109 +1,108 @@
-// popup.js — Web Guardian Safari (Aligned with your domainDB.js structure)
+import { normalizeDomain, lookupDomain, blockDomain, listDomains } from "./apiClient.js";
 
-// ------------------------------------------------------------
-// DOMAIN DB (Perfectly aligned with your domainDB.js)
-// ------------------------------------------------------------
-function normalizeDomain(url) {
-  try {
-    const u = new URL(url);
-    const hostname = u.hostname.toLowerCase();
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) return hostname;
-    return hostname.startsWith("www.") ? hostname.slice(4) : hostname;
-  } catch {
-    return "";
-  }
-}
-
-async function getDomainStatus(domain) {
-  const result = await browser.storage.local.get("domainDB");
-  const domainDB = result.domainDB || {};
-  const entry = domainDB[domain];
-  if (!entry) return null;
-  return entry.status; // Returns "BLOCK" or "SAFE"
-}
-
-async function setDomainStatus(domain, status) {
-  const result = await browser.storage.local.get("domainDB");
-  const domainDB = result.domainDB || {};
-  
-  const updated = {
-    ...domainDB,
-    [domain]: {
-      status,
-      cachedAt: Date.now(),
-    },
-  };
-  await browser.storage.local.set({ domainDB: updated });
-}
-
-// ------------------------------------------------------------
-// TOAST
-// ------------------------------------------------------------
 function showToast(message) {
   const toast = document.getElementById("toast");
+  if (!toast) return;
   toast.textContent = message;
   toast.style.display = "block";
   setTimeout(() => { toast.style.display = "none"; }, 2500);
 }
 
-// ------------------------------------------------------------
-// STATS (Correctly parses the domainDB wrapper object)
-// ------------------------------------------------------------
-async function loadStats() {
-  const result = await browser.storage.local.get("domainDB");
-  const db = result.domainDB || {};
-  const entries = Object.values(db);
-  
-  const blocked = entries.filter(e => e.status === "BLOCK").length;
-  
-  document.getElementById("blocked-count").textContent = String(blocked);
-  document.getElementById("total-count").textContent = String(entries.length);
+async function getCurrentTab() {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  return tabs[0] ?? null;
 }
 
-// ------------------------------------------------------------
-// INIT
-// ------------------------------------------------------------
-async function init() {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  const tab = tabs[0] ?? null;
+function renderStatus(el, filter) {
+  if (filter === "BLOCKED") {
+    el.innerHTML = `<span class="status-badge status-blocked">🚫 Blocked</span>`;
+  } else if (filter === "SAFE") {
+    el.innerHTML = `<span class="status-badge status-safe">✅ Permanently safe</span>`;
+  } else if (filter === "OKAY") {
+    el.innerHTML = `<span class="status-badge status-okay">🟡 Okay (path checked)</span>`;
+  } else {
+    el.innerHTML = `<span class="status-badge status-unknown">❔ Not tracked yet</span>`;
+  }
+}
 
+function disableButton(btn, text) {
+  btn.disabled = true;
+  btn.className = "btn-disabled";
+  btn.textContent = text;
+}
+
+async function loadStats() {
+  const blockedCountEl = document.getElementById("blocked-count");
+  const totalCountEl = document.getElementById("total-count");
+  try {
+    const [blocked, all] = await Promise.all([listDomains("BLOCKED"), listDomains()]);
+    if (blockedCountEl) blockedCountEl.textContent = String(blocked.length);
+    if (totalCountEl) totalCountEl.textContent = String(all.length);
+  } catch (err) {
+    console.error("[Pure Path] Failed to load stats:", err);
+    if (blockedCountEl) blockedCountEl.textContent = "—";
+    if (totalCountEl) totalCountEl.textContent = "—";
+  }
+}
+
+async function init() {
   const domainEl = document.getElementById("current-domain");
   const statusEl = document.getElementById("current-status");
   const blockBtn = document.getElementById("btn-block-site");
-  const confirmBox = document.getElementById("confirm-box");
-  const confirmYes = document.getElementById("confirm-yes");
-  const confirmNo = document.getElementById("confirm-no");
 
+  if (!domainEl || !statusEl || !blockBtn) return;
+
+  loadStats();
+
+  const tab = await getCurrentTab();
   if (!tab?.url) {
     domainEl.textContent = "No active tab";
-    blockBtn.disabled = true;
-    blockBtn.className = "btn btn-disabled";
+    disableButton(blockBtn, "Unavailable");
+    return;
+  }
+
+  if (
+    tab.url.startsWith("safari-extension://") ||
+    tab.url.startsWith("safari-web-extension://") ||
+    tab.url.startsWith("about:")
+  ) {
+    domainEl.textContent = "System Page";
+    statusEl.innerHTML = `<span class="status-badge status-unknown">Internal</span>`;
+    disableButton(blockBtn, "Cannot block system pages");
     return;
   }
 
   const domain = normalizeDomain(tab.url);
-
   if (!domain) {
     domainEl.textContent = "Cannot detect domain";
-    blockBtn.disabled = true;
-    blockBtn.className = "btn btn-disabled";
+    disableButton(blockBtn, "Invalid domain");
     return;
   }
 
   domainEl.textContent = domain;
 
-  const status = await getDomainStatus(domain);
-  if (status === "BLOCK") {
-    statusEl.innerHTML = `<span class="status-badge status-block">🚫 Already Blocked</span>`;
-    blockBtn.disabled = true;
-    blockBtn.className = "btn btn-disabled";
-    blockBtn.textContent = "🚫 Already Blocked";
-  } else {
-    statusEl.innerHTML = `<span class="status-badge status-unknown">❓ Not blocked</span>`;
+  let currentFilter = null;
+  try {
+    currentFilter = await lookupDomain(domain);
+    renderStatus(statusEl, currentFilter);
+  } catch (err) {
+    console.error("[Pure Path] Backend lookup error:", err);
+    statusEl.innerHTML = `<span class="status-badge status-unknown">⚠️ Backend offline</span>`;
   }
 
-  // Show inline confirm box instead of confirm()
+  if (currentFilter === "BLOCKED") {
+    disableButton(blockBtn, "Already blocked");
+  } else if (currentFilter === "SAFE") {
+    disableButton(blockBtn, "Permanently safe — can't block here");
+  }
+
+  const confirmBox = document.getElementById("confirm-box");
+  const confirmYes = document.getElementById("confirm-yes");
+  const confirmNo = document.getElementById("confirm-no");
+
   blockBtn.addEventListener("click", () => {
+    // window.confirm() is unreliable inside Safari extension popups —
+    // use an inline confirm box instead (matches the old extension's proven fix).
     confirmBox.style.display = "block";
     blockBtn.style.display = "none";
   });
@@ -114,25 +113,36 @@ async function init() {
   });
 
   confirmYes.addEventListener("click", async () => {
-    await setDomainStatus(domain, "BLOCK");
-    statusEl.innerHTML = `<span class="status-badge status-block">🚫 Blocked</span>`;
     confirmBox.style.display = "none";
-    blockBtn.disabled = true;
-    blockBtn.className = "btn btn-disabled";
-    blockBtn.textContent = "🚫 Already Blocked";
     blockBtn.style.display = "block";
-    showToast(`"${domain}" has been blocked`);
-    await loadStats();
+    blockBtn.disabled = true;
+    blockBtn.textContent = "Blocking…";
 
-    if (tab.id) {
-      const blockUrl = browser.runtime.getURL(
-        `block.html?reason=${encodeURIComponent("Manually blocked via Web Guardian")}&url=${encodeURIComponent(tab.url)}`
-      );
-      browser.tabs.update(tab.id, { url: blockUrl });
+    try {
+      await blockDomain(domain);
+      renderStatus(statusEl, "BLOCKED");
+      disableButton(blockBtn, "Already blocked");
+      showToast(`"${domain}" has been blocked`);
+      await loadStats();
+
+      if (tab.id) {
+        const blockUrl = browser.runtime.getURL(
+          `block.html?reason=${encodeURIComponent("Manually blocked via Pure Path")}&url=${encodeURIComponent(tab.url)}`
+        );
+        browser.tabs.update(tab.id, { url: blockUrl });
+      }
+    } catch (err) {
+      console.error("[Pure Path] Error blocking domain:", err);
+      showToast("Failed to block — check backend connection");
+      blockBtn.disabled = false;
+      blockBtn.className = "btn-danger";
+      blockBtn.textContent = "Block this site";
     }
   });
-
-  await loadStats();
 }
 
-init();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
