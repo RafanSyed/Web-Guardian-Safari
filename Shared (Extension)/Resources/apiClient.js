@@ -4,14 +4,14 @@
 // domains still need a path/query check every visit, so a cache wasn't
 // buying enough to be worth the staleness risk).
 
-const API_BASE_URL = "http://localhost:3000"; // TODO: your real Render backend URL
+const API_BASE_URL = "https://purepathbackend.onrender.com"; // TODO: your real Render backend URL
 
 // Unlike the Chrome extension (which uses esbuild's --define to inject this at
 // build time), this Safari extension has no build step — Xcode loads these
 // files as-is. So this has to be a plain hardcoded value. Since this is a
 // personal, non-App-Store-distributed extension, that's an accepted tradeoff —
 // just know this token is visible to anyone with access to the source/binary.
-const API_AUTH_TOKEN = "1234"; // must match backend's API_AUTH_TOKEN exactly
+const API_AUTH_TOKEN = ""; // must match backend's API_AUTH_TOKEN exactly
 
 function authedJsonHeaders() {
   return {
